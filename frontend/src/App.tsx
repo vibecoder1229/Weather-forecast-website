@@ -1,13 +1,12 @@
 import { WeatherProvider } from "./contexts/WeatherContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { WeatherNavbar } from "./components/WeatherNavbar";
-import { CurrentWeatherCard } from "./components/CurrentWeatherCard";
+import { EnhancedCurrentWeatherCard } from "./components/EnhancedCurrentWeatherCard";
 import { WeatherForecast } from "./components/WeatherForecast";
 import { WeatherAlerts } from "./components/WeatherAlerts";
 import { WeatherMap } from "./components/WeatherMap";
 import { AISummary } from "./components/AISummary";
 import { TripWeather } from "./components/TripWeather";
-import { UserSettings } from "./components/UserSettings";
 import { WeatherFooter } from "./components/WeatherFooter";
 import { ImageWithFallback } from "./components/figma/ImageWithFallback";
 
@@ -42,9 +41,9 @@ export default function App() {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* Current Weather - Full width on mobile, 2 cols on desktop */}
+          {/* Enhanced Current Weather - Full width on mobile, 2 cols on desktop */}
           <div className="col-span-full lg:col-span-2 weather-card-float">
-            <CurrentWeatherCard />
+            <EnhancedCurrentWeatherCard />
           </div>
           
           {/* Weather Alerts - 2 cols on desktop */}
@@ -71,12 +70,10 @@ export default function App() {
           <div className="col-span-full lg:col-span-2 weather-card-float stagger-delay-5">
             <TripWeather />
           </div>
-          
-          {/* User Settings - 2 cols on desktop */}
-          <div className="col-span-full lg:col-span-2 weather-card-float stagger-delay-1">
-            <UserSettings />
-          </div>
         </div>
+
+        {/* Advanced Weather Features Section */}
+                {/* Additional Features Section */}
 
         {/* Additional Features Section */}
         <div className="mt-12 pt-8 border-t border-border">

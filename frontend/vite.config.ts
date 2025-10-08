@@ -5,6 +5,8 @@
 
   export default defineConfig({
     plugins: [react()],
+    // Explicitly specify the public directory for static assets
+    publicDir: 'public',
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
       alias: {
@@ -52,9 +54,15 @@
     build: {
       target: 'esnext',
       outDir: 'build',
+      // Ensure assets are copied to build directory
+      assetsDir: 'assets',
+      // Copy public directory files to build output
+      copyPublicDir: true,
     },
     server: {
       port: 3000,
       open: true,
+      // Add CORS headers for development
+      cors: true,
     },
   });

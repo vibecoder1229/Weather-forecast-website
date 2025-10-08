@@ -7,6 +7,8 @@ import type {
   ForecastWeatherResponse,
   CitySearchResponse,
   HealthCheckResponse,
+  EnhancedCurrentWeatherResponse,
+  EnhancedForecastWeatherResponse,
 } from '../types/api';
 import { isApiError, isApiSuccess } from '../types/api';
 
@@ -190,6 +192,142 @@ export const weatherApi = {
    */
   async healthCheck(): Promise<HealthCheckResponse> {
     return apiCall<HealthCheckResponse>(`${API_BASE_URL}/api/health`);
+  },
+
+  // ============================================================================
+  // Enhanced Weather API Methods
+  // ============================================================================
+
+  /**
+   * Get enhanced current weather with comprehensive recommendations and insights
+   */
+  async getEnhancedCurrentWeather(query: LocationQuery): Promise<EnhancedCurrentWeatherResponse> {
+    return apiCall<EnhancedCurrentWeatherResponse>(
+      `${API_BASE_URL}/api/weather/enhanced-current`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(query),
+      }
+    );
+  },
+
+  /**
+   * Get enhanced forecast with hourly data and comprehensive recommendations
+   */
+  async getEnhancedForecast(query: ForecastQuery): Promise<EnhancedForecastWeatherResponse> {
+    return apiCall<EnhancedForecastWeatherResponse>(
+      `${API_BASE_URL}/api/weather/enhanced-forecast`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(query),
+      }
+    );
+  },
+
+  // ============================================================================
+  // New Weather API Methods
+  // ============================================================================
+
+  /**
+   * Get astronomy data (sunrise, sunset, moon phase)
+   */
+  async getAstronomy(query: LocationQuery): Promise<any> {
+    return apiCall<any>(
+      `${API_BASE_URL}/api/weather/astronomy`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(query),
+      }
+    );
+  },
+
+  /**
+   * Get historical weather data
+   */
+  async getHistoricalWeather(query: LocationQuery & { date: string }): Promise<any> {
+    return apiCall<any>(
+      `${API_BASE_URL}/api/weather/history`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(query),
+      }
+    );
+  },
+
+  /**
+   * Get marine weather conditions
+   */
+  async getMarineWeather(query: LocationQuery & { days?: number }): Promise<any> {
+    return apiCall<any>(
+      `${API_BASE_URL}/api/weather/marine`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(query),
+      }
+    );
+  },
+
+  /**
+   * Get sports events
+   */
+  async getSportsEvents(query: LocationQuery): Promise<any> {
+    return apiCall<any>(
+      `${API_BASE_URL}/api/weather/sports`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(query),
+      }
+    );
+  },
+
+  /**
+   * Get timezone information
+   */
+  async getTimezone(query: LocationQuery): Promise<any> {
+    return apiCall<any>(
+      `${API_BASE_URL}/api/weather/timezone`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(query),
+      }
+    );
+  },
+
+  /**
+   * Get future weather forecast
+   */
+  async getFutureWeather(query: LocationQuery & { date: string }): Promise<any> {
+    return apiCall<any>(
+      `${API_BASE_URL}/api/weather/future`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(query),
+      }
+    );
   },
 };
 

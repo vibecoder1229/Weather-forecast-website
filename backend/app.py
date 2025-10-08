@@ -17,6 +17,14 @@ from validate_information import (
     VietnameseCityNormalizer
 )
 
+# Import enhancement modules
+from weather_enhancements import (
+    ActivityRecommender,
+    AstronomyCalculator,
+    AirQualityEnhancer,
+    WeatherInsights
+)
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -82,6 +90,13 @@ WEATHER_API_KEY = os.getenv('WEATHERAPI_KEY', 'YOUR_WEATHERAPI_KEY')
 WEATHERAPI_BASE_URL = os.getenv('WEATHERAPI_BASE_URL', 'http://api.weatherapi.com/v1')
 WEATHER_API_CURRENT_URL = f'{WEATHERAPI_BASE_URL}/current.json'
 WEATHER_API_FORECAST_URL = f'{WEATHERAPI_BASE_URL}/forecast.json'
+WEATHER_API_ASTRONOMY_URL = f'{WEATHERAPI_BASE_URL}/astronomy.json'
+WEATHER_API_HISTORY_URL = f'{WEATHERAPI_BASE_URL}/history.json'
+WEATHER_API_MARINE_URL = f'{WEATHERAPI_BASE_URL}/marine.json'
+WEATHER_API_FUTURE_URL = f'{WEATHERAPI_BASE_URL}/future.json'
+WEATHER_API_TIMEZONE_URL = f'{WEATHERAPI_BASE_URL}/timezone.json'
+WEATHER_API_SPORTS_URL = f'{WEATHERAPI_BASE_URL}/sports.json'
+WEATHER_API_SEARCH_URL = f'{WEATHERAPI_BASE_URL}/search.json'
 
 # Server Configuration
 FLASK_PORT = int(os.getenv('FLASK_PORT', 5000))
@@ -140,6 +155,140 @@ def get_english_recommendation(category):
 	}
 	return recommendations.get(category, 'No recommendation available.')
 
+# ============================================================================
+# ENHANCEMENT HELPER FUNCTIONS
+# ============================================================================
+
+def _enhance_current_weather_basic(weather_data):
+	"""
+	Add basic enhancements to current weather data without breaking existing structure
+	
+	Args:
+		weather_data: Basic weather data from WeatherAPI
+		
+	Returns:
+		Enhanced weather data with additional insights
+	"""
+	try:
+		current = weather_data.get('current', {})
+		
+		# Add enhanced air quality if available
+		if current.get('air_quality'):
+			enhanced_air_quality = AirQualityEnhancer.enhance_air_quality_data(current['air_quality'])
+			weather_data['current']['air_quality_enhanced'] = enhanced_air_quality
+		
+		# Add basic activity recommendations
+		clothing_recs = ActivityRecommender.get_clothing_recommendations(weather_data)
+		weather_data['basic_recommendations'] = {
+			'clothing': clothing_recs
+		}
+		
+		# Add comfort index
+		temp_c = current.get('temp_c', 20)
+		humidity = current.get('humidity', 50)
+		wind_kph = current.get('wind_kph', 0)
+		comfort_index = AstronomyCalculator.calculate_comfort_index(temp_c, humidity, wind_kph)
+		weather_data['current']['comfort_index'] = comfort_index
+		
+		return weather_data
+		
+	except Exception as e:
+		print(f"[WARNING] Enhancement failed, returning basic data: {str(e)}")
+		return weather_data
+
+def _enhance_current_weather_full(weather_data):
+	"""
+	Add comprehensive enhancements to current weather data
+	
+	Args:
+		weather_data: Basic weather data from WeatherAPI with forecast
+		
+	Returns:
+		Fully enhanced weather data with all insights
+	"""
+	try:
+		current = weather_data.get('current', {})
+		location = weather_data.get('location', {})
+		astro = weather_data.get('forecast', {}).get('forecastday', [{}])[0].get('astro', {})
+		
+		# Get basic weather values
+		temp_c = current.get('temp_c', 20)
+		humidity = current.get('humidity', 50)
+		wind_kph = current.get('wind_kph', 0)
+		uv = current.get('uv', 0)
+		
+		# Calculate enhanced astronomy data
+		sunrise = astro.get('sunrise', '06:00')
+		sunset = astro.get('sunset', '18:00')
+		moon_phase = astro.get('moon_phase', 'Unknown')
+		moon_illumination = astro.get('moon_illumination', 0)
+		
+		golden_blue_hours = AstronomyCalculator.calculate_golden_blue_hours(sunrise, sunset)
+		comfort_index = AstronomyCalculator.calculate_comfort_index(temp_c, humidity, wind_kph)
+		heat_index = AstronomyCalculator.calculate_heat_index(temp_c, humidity)
+		wind_chill = AstronomyCalculator.calculate_wind_chill(temp_c, wind_kph)
+		uv_recommendations = AstronomyCalculator.get_uv_recommendations(uv)
+		
+		# Get activity and clothing recommendations
+		clothing_recs = ActivityRecommender.get_clothing_recommendations(weather_data)
+		activity_recs = ActivityRecommender.get_activity_recommendations(weather_data)
+		travel_conditions = ActivityRecommender.get_travel_conditions(weather_data)
+		
+		# Enhanced air quality analysis
+		enhanced_air_quality = {}
+		if current.get('air_quality'):
+			enhanced_air_quality = AirQualityEnhancer.enhance_air_quality_data(current['air_quality'])
+		
+		# Weather insights
+		weather_insights = WeatherInsights.generate_weather_insights(weather_data)
+		
+		# Build enhanced data structure
+		enhanced_data = {
+			# Original data
+			**weather_data,
+			
+			# Enhanced astronomy data
+			'astronomy': {
+				'sunrise': sunrise,
+				'sunset': sunset,
+				'moonrise': astro.get('moonrise', ''),
+				'moonset': astro.get('moonset', ''),
+				'moon_phase': moon_phase,
+				'moon_phase_vi': AstronomyCalculator.get_moon_phase_vietnamese(moon_phase),
+				'moon_illumination': moon_illumination,
+				**golden_blue_hours
+			},
+			
+			# Enhanced environmental data
+			'environmental': {
+				'uv_index': uv,
+				**uv_recommendations,
+				'dew_point': current.get('dewpoint_c', temp_c - 5),
+				'heat_index': heat_index,
+				'wind_chill': wind_chill if wind_chill != temp_c else None,
+				'comfort_index': comfort_index
+			},
+			
+			# Activity and clothing recommendations
+			'recommendations': {
+				'clothing': clothing_recs,
+				'activities': activity_recs,
+				'travel': travel_conditions
+			},
+			
+			# Enhanced air quality
+			'air_quality_enhanced': enhanced_air_quality,
+			
+			# Weather insights
+			'insights': weather_insights
+		}
+		
+		return enhanced_data
+		
+	except Exception as e:
+		print(f"[WARNING] Full enhancement failed, returning basic data: {str(e)}")
+		return weather_data
+
 # API Routes
 
 
@@ -197,8 +346,11 @@ def get_current_weather():
 		# Translate to Vietnamese
 		weather_data = WeatherTranslator.translate_current_weather(weather_data)
 		
+		# Add basic enhancements to current weather
+		enhanced_data = _enhance_current_weather_basic(weather_data)
+		
 		# Format response
-		formatted_data = ResponseFormatter.format_current_weather(weather_data)
+		formatted_data = ResponseFormatter.format_current_weather(enhanced_data)
 		success_response = ResponseFormatter.format_success(
 			formatted_data,
 			'Lấy dữ liệu thời tiết hiện tại thành công'
@@ -503,13 +655,12 @@ def search_cities():
 			print(f"[DEBUG] Searching with query: {search_query}")
 			
 			# Use WeatherAPI search endpoint
-			search_url = 'http://api.weatherapi.com/v1/search.json'
 			params = {
 				'key': WEATHER_API_KEY,
 				'q': search_query
 			}
 			
-			resp = requests.get(search_url, params=params, timeout=10)
+			resp = requests.get(WEATHER_API_SEARCH_URL, params=params, timeout=10)
 			resp.raise_for_status()
 			
 			search_results = resp.json()
@@ -568,6 +719,902 @@ def search_cities():
 		
 	except Exception as e:
 		print(f"[ERROR] Unexpected error: {str(e)}")
+		error_response = ResponseFormatter.format_error(
+			f'Lỗi không mong muốn: {str(e)}',
+			'INTERNAL_ERROR',
+			500
+		)
+		return jsonify(error_response), 500
+
+# ============================================================================
+# ENHANCED API ENDPOINTS
+# ============================================================================
+
+@app.route('/api/weather/enhanced-current', methods=['POST'])
+def get_enhanced_current_weather():
+	"""
+	Get enhanced current weather with comprehensive recommendations and insights
+	"""
+	print(f"[DEBUG] Received request to /api/weather/enhanced-current")
+	
+	if not request.is_json:
+		error_response = ResponseFormatter.format_error(
+			'Content-Type phải là application/json',
+			'INVALID_CONTENT_TYPE'
+		)
+		return jsonify(error_response), 400
+	
+	data = request.get_json()
+	print(f"[DEBUG] Request data: {data}")
+	
+	# Sanitize and validate input
+	data = InputValidator.sanitize_input(data)
+	is_valid, error_msg, cleaned_data = InputValidator.validate_location_request(data)
+	if not is_valid:
+		error_response = ResponseFormatter.format_error(error_msg, 'VALIDATION_ERROR')
+		return jsonify(error_response), 400
+	
+	# Build query
+	if 'location' in cleaned_data:
+		query = cleaned_data['location']
+	else:
+		query = f"{cleaned_data['lat']},{cleaned_data['lon']}"
+	
+	# Get weather data with forecast for astronomy info
+	params = {
+		'key': WEATHER_API_KEY,
+		'q': query,
+		'days': 1,  # Need forecast for astronomy data
+		'aqi': 'yes',
+		'alerts': 'yes'
+	}
+	
+	try:
+		resp = requests.get(WEATHER_API_FORECAST_URL, params=params, timeout=10)
+		resp.raise_for_status()
+		
+		weather_data = resp.json()
+		
+		# Translate to Vietnamese
+		weather_data = WeatherTranslator.translate_current_weather(weather_data)
+		weather_data = WeatherTranslator.translate_forecast(weather_data)
+		
+		# Enhance the data
+		enhanced_data = _enhance_current_weather_full(weather_data)
+		
+		# Format the enhanced response
+		current_weather = enhanced_data.get('current', {})
+		
+		# Ensure condition data is properly formatted
+		if 'condition' in current_weather and current_weather['condition']:
+			condition = current_weather['condition']
+			if isinstance(condition, dict) and 'code' not in condition:
+				# If condition doesn't have code, try to extract from original data
+				original_condition = weather_data.get('current', {}).get('condition', {})
+				condition['code'] = original_condition.get('code', 1000)
+				current_weather['condition'] = condition
+		
+		formatted_data = {
+			'location': ResponseFormatter._format_location(enhanced_data.get('location', {})),
+			'current': ResponseFormatter._format_current(current_weather),
+			'astronomy': enhanced_data.get('astronomy', {}),
+			'environmental': enhanced_data.get('environmental', {}),
+			'recommendations': enhanced_data.get('recommendations', {}),
+			'air_quality_enhanced': enhanced_data.get('air_quality_enhanced', {}),
+			'insights': enhanced_data.get('insights', {})
+		}
+		
+		success_response = ResponseFormatter.format_success(
+			formatted_data,
+			'Lấy dữ liệu thời tiết nâng cao thành công'
+		)
+		
+		return jsonify(success_response), 200
+		
+	except requests.exceptions.HTTPError as e:
+		print(f"[ERROR] WeatherAPI HTTP error: {e}")
+		error_response = ResponseFormatter.format_error(
+			'Không thể lấy dữ liệu thời tiết',
+			'API_ERROR',
+			500
+		)
+		return jsonify(error_response), 500
+		
+	except Exception as e:
+		print(f"[ERROR] Unexpected error: {str(e)}")
+		error_response = ResponseFormatter.format_error(
+			f'Lỗi không mong muốn: {str(e)}',
+			'INTERNAL_ERROR',
+			500
+		)
+		return jsonify(error_response), 500
+
+@app.route('/api/weather/enhanced-forecast', methods=['POST'])
+def get_enhanced_forecast():
+	"""
+	Get enhanced forecast with hourly data and comprehensive recommendations
+	"""
+	print(f"[DEBUG] Received request to /api/weather/enhanced-forecast")
+	
+	if not request.is_json:
+		error_response = ResponseFormatter.format_error(
+			'Content-Type phải là application/json',
+			'INVALID_CONTENT_TYPE'
+		)
+		return jsonify(error_response), 400
+	
+	data = request.get_json()
+	data = InputValidator.sanitize_input(data)
+	is_valid, error_msg, cleaned_data = InputValidator.validate_location_request(data)
+	
+	if not is_valid:
+		error_response = ResponseFormatter.format_error(error_msg, 'VALIDATION_ERROR')
+		return jsonify(error_response), 400
+	
+	# Build query
+	if 'location' in cleaned_data:
+		query = cleaned_data['location']
+	else:
+		query = f"{cleaned_data['lat']},{cleaned_data['lon']}"
+	
+	days = cleaned_data.get('days', 7)
+	
+	params = {
+		'key': WEATHER_API_KEY,
+		'q': query,
+		'days': days,
+		'aqi': 'yes',
+		'alerts': 'yes'
+	}
+	
+	try:
+		resp = requests.get(WEATHER_API_FORECAST_URL, params=params, timeout=10)
+		resp.raise_for_status()
+		
+		weather_data = resp.json()
+		
+		# Translate to Vietnamese
+		weather_data = WeatherTranslator.translate_forecast(weather_data)
+		weather_data = WeatherTranslator.translate_alerts(weather_data)
+		
+		# Enhance current weather data
+		enhanced_current = _enhance_current_weather_full(weather_data)
+		
+		# Format basic forecast data
+		formatted_forecast = ResponseFormatter.format_forecast(weather_data)
+		
+		# Add hourly data if available
+		forecast_days = weather_data.get('forecast', {}).get('forecastday', [])
+		enhanced_hourly = []
+		
+		for day in forecast_days[:2]:  # Only process first 2 days for hourly data
+			hours = day.get('hour', [])
+			for hour in hours:
+				enhanced_hourly.append({
+					'time': hour.get('time', ''),
+					'time_epoch': hour.get('time_epoch', 0),
+					'temp_c': hour.get('temp_c', 0),
+					'feelslike_c': hour.get('feelslike_c', 0),
+					'condition': {
+						'text': hour.get('condition', {}).get('text', ''),
+						'text_vi': hour.get('condition', {}).get('text_vi', ''),
+						'icon': hour.get('condition', {}).get('icon', ''),
+						'code': hour.get('condition', {}).get('code', 0)
+					},
+					'wind_kph': hour.get('wind_kph', 0),
+					'wind_dir': hour.get('wind_dir', ''),
+					'pressure_mb': hour.get('pressure_mb', 0),
+					'humidity': hour.get('humidity', 0),
+					'cloud': hour.get('cloud', 0),
+					'chance_of_rain': hour.get('chance_of_rain', 0),
+					'chance_of_snow': hour.get('chance_of_snow', 0),
+					'uv': hour.get('uv', 0),
+					'vis_km': hour.get('vis_km', 0)
+				})
+		
+		# Build enhanced forecast structure
+		enhanced_forecast = {
+			# Basic forecast data
+			**formatted_forecast,
+			
+			# Enhanced hourly data
+			'hourly_forecast': {
+				'hours': enhanced_hourly
+			},
+			
+			# Current weather with all enhancements
+			'current_enhanced': {
+				'location': ResponseFormatter._format_location(enhanced_current.get('location', {})),
+				'current': ResponseFormatter._format_current(enhanced_current.get('current', {})),
+				'astronomy': enhanced_current.get('astronomy', {}),
+				'environmental': enhanced_current.get('environmental', {}),
+				'recommendations': enhanced_current.get('recommendations', {}),
+				'air_quality_enhanced': enhanced_current.get('air_quality_enhanced', {}),
+				'insights': enhanced_current.get('insights', {})
+			}
+		}
+		
+		success_response = ResponseFormatter.format_success(
+			enhanced_forecast,
+			f'Lấy dự báo nâng cao {days} ngày thành công'
+		)
+		
+		return jsonify(success_response), 200
+		
+	except Exception as e:
+		print(f"[ERROR] Error in enhanced forecast: {str(e)}")
+		error_response = ResponseFormatter.format_error(
+			f'Lỗi không mong muốn: {str(e)}',
+			'INTERNAL_ERROR',
+			500
+		)
+		return jsonify(error_response), 500
+
+# ============================================================================
+# ADDITIONAL WEATHERAPI ENDPOINTS
+# ============================================================================
+
+@app.route('/api/weather/astronomy', methods=['POST'])
+def get_astronomy():
+	"""
+	Get astronomy data (sunrise, sunset, moon phases) for a specific location and date
+	"""
+	print(f"[DEBUG] Received request to /api/weather/astronomy")
+	
+	if not request.is_json:
+		error_response = ResponseFormatter.format_error(
+			'Content-Type phải là application/json',
+			'INVALID_CONTENT_TYPE'
+		)
+		return jsonify(error_response), 400
+
+	data = request.get_json()
+	print(f"[DEBUG] Request data: {data}")
+
+	# Sanitize and validate input
+	data = InputValidator.sanitize_input(data)
+	is_valid, error_msg, cleaned_data = InputValidator.validate_location_request(data)
+	if not is_valid:
+		error_response = ResponseFormatter.format_error(error_msg, 'VALIDATION_ERROR')
+		return jsonify(error_response), 400
+
+	# Build query
+	if 'location' in cleaned_data:
+		query = cleaned_data['location']
+	else:
+		query = f"{cleaned_data['lat']},{cleaned_data['lon']}"
+
+	# Get date parameter (optional, defaults to today)
+	date = data.get('date', '')  # Format: YYYY-MM-DD
+
+	params = {
+		'key': WEATHER_API_KEY,
+		'q': query
+	}
+	
+	if date:
+		params['dt'] = date
+
+	try:
+		print(f"[DEBUG] Calling WeatherAPI astronomy with params: {params}")
+		resp = requests.get(WEATHER_API_ASTRONOMY_URL, params=params, timeout=10)
+		resp.raise_for_status()
+		print(f"[DEBUG] WeatherAPI astronomy response successful")
+
+		astronomy_data = resp.json()
+		
+		# Translate and format response
+		formatted_data = {
+			'location': ResponseFormatter._format_location(astronomy_data.get('location', {})),
+			'astronomy': ResponseFormatter._format_astronomy(astronomy_data.get('astronomy', {}))
+		}
+
+		success_response = ResponseFormatter.format_success(
+			formatted_data,
+			'Dữ liệu thiên văn học lấy thành công'
+		)
+		
+		return jsonify(success_response), 200
+
+	except requests.exceptions.HTTPError as e:
+		print(f"[ERROR] WeatherAPI astronomy HTTP error: {e}")
+		if resp.status_code == 400:
+			error_response = ResponseFormatter.format_error(
+				'Địa điểm hoặc tọa độ không hợp lệ',
+				'INVALID_LOCATION',
+				400
+			)
+			return jsonify(error_response), 400
+		elif resp.status_code == 401:
+			error_response = ResponseFormatter.format_error(
+				'API key không hợp lệ',
+				'INVALID_API_KEY',
+				401
+			)
+			return jsonify(error_response), 401
+		elif resp.status_code == 403:
+			error_response = ResponseFormatter.format_error(
+				'API key đã vượt quá giới hạn',
+				'API_LIMIT_EXCEEDED',
+				403
+			)
+			return jsonify(error_response), 403
+		else:
+			error_response = ResponseFormatter.format_error(
+				f'Lỗi WeatherAPI: {str(e)}',
+				'WEATHER_API_ERROR',
+				resp.status_code
+			)
+			return jsonify(error_response), resp.status_code
+
+	except requests.exceptions.Timeout:
+		print(f"[ERROR] WeatherAPI astronomy timeout")
+		error_response = ResponseFormatter.format_error(
+			'Request timeout. Vui lòng thử lại',
+			'REQUEST_TIMEOUT',
+			504
+		)
+		return jsonify(error_response), 504
+
+	except Exception as e:
+		print(f"[ERROR] Error in astronomy: {str(e)}")
+		error_response = ResponseFormatter.format_error(
+			f'Lỗi không mong muốn: {str(e)}',
+			'INTERNAL_ERROR',
+			500
+		)
+		return jsonify(error_response), 500
+
+@app.route('/api/weather/history', methods=['POST'])
+def get_weather_history():
+	"""
+	Get historical weather data for a specific location and date range
+	"""
+	print(f"[DEBUG] Received request to /api/weather/history")
+	
+	if not request.is_json:
+		error_response = ResponseFormatter.format_error(
+			'Content-Type phải là application/json',
+			'INVALID_CONTENT_TYPE'
+		)
+		return jsonify(error_response), 400
+
+	data = request.get_json()
+	print(f"[DEBUG] Request data: {data}")
+
+	# Sanitize and validate input
+	data = InputValidator.sanitize_input(data)
+	is_valid, error_msg, cleaned_data = InputValidator.validate_location_request(data)
+	if not is_valid:
+		error_response = ResponseFormatter.format_error(error_msg, 'VALIDATION_ERROR')
+		return jsonify(error_response), 400
+
+	# Build query
+	if 'location' in cleaned_data:
+		query = cleaned_data['location']
+	else:
+		query = f"{cleaned_data['lat']},{cleaned_data['lon']}"
+
+	# Get date parameter (required for history)
+	date = data.get('date')
+	if not date:
+		error_response = ResponseFormatter.format_error(
+			'Thiếu tham số date (YYYY-MM-DD)',
+			'MISSING_DATE_PARAMETER'
+		)
+		return jsonify(error_response), 400
+
+	params = {
+		'key': WEATHER_API_KEY,
+		'q': query,
+		'dt': date,
+		'aqi': 'yes'
+	}
+
+	# Optional end date for date range
+	end_date = data.get('end_date')
+	if end_date:
+		params['end_dt'] = end_date
+
+	try:
+		print(f"[DEBUG] Calling WeatherAPI history with params: {params}")
+		resp = requests.get(WEATHER_API_HISTORY_URL, params=params, timeout=10)
+		resp.raise_for_status()
+		print(f"[DEBUG] WeatherAPI history response successful")
+
+		history_data = resp.json()
+		
+		# Translate to Vietnamese
+		history_data = WeatherTranslator.translate_forecast(history_data)
+		
+		# Format response
+		formatted_data = {
+			'location': ResponseFormatter._format_location(history_data.get('location', {})),
+			'forecast': ResponseFormatter._format_forecast(history_data.get('forecast', {}))
+		}
+
+		success_response = ResponseFormatter.format_success(
+			formatted_data,
+			'Dữ liệu lịch sử thời tiết lấy thành công'
+		)
+		
+		return jsonify(success_response), 200
+
+	except requests.exceptions.HTTPError as e:
+		print(f"[ERROR] WeatherAPI history HTTP error: {e}")
+		if resp.status_code == 400:
+			error_response = ResponseFormatter.format_error(
+				'Địa điểm, tọa độ hoặc ngày không hợp lệ',
+				'INVALID_LOCATION_OR_DATE',
+				400
+			)
+			return jsonify(error_response), 400
+		elif resp.status_code == 401:
+			error_response = ResponseFormatter.format_error(
+				'API key không hợp lệ',
+				'INVALID_API_KEY',
+				401
+			)
+			return jsonify(error_response), 401
+		elif resp.status_code == 403:
+			error_response = ResponseFormatter.format_error(
+				'API key đã vượt quá giới hạn hoặc không có quyền truy cập dữ liệu lịch sử',
+				'API_LIMIT_EXCEEDED',
+				403
+			)
+			return jsonify(error_response), 403
+		else:
+			error_response = ResponseFormatter.format_error(
+				f'Lỗi WeatherAPI: {str(e)}',
+				'WEATHER_API_ERROR',
+				resp.status_code
+			)
+			return jsonify(error_response), resp.status_code
+
+	except requests.exceptions.Timeout:
+		print(f"[ERROR] WeatherAPI history timeout")
+		error_response = ResponseFormatter.format_error(
+			'Request timeout. Vui lòng thử lại',
+			'REQUEST_TIMEOUT',
+			504
+		)
+		return jsonify(error_response), 504
+
+	except Exception as e:
+		print(f"[ERROR] Error in history: {str(e)}")
+		error_response = ResponseFormatter.format_error(
+			f'Lỗi không mong muốn: {str(e)}',
+			'INTERNAL_ERROR',
+			500
+		)
+		return jsonify(error_response), 500
+
+@app.route('/api/weather/marine', methods=['POST'])
+def get_marine_weather():
+	"""
+	Get marine/ocean weather data for coastal and maritime activities
+	"""
+	print(f"[DEBUG] Received request to /api/weather/marine")
+	
+	if not request.is_json:
+		error_response = ResponseFormatter.format_error(
+			'Content-Type phải là application/json',
+			'INVALID_CONTENT_TYPE'
+		)
+		return jsonify(error_response), 400
+
+	data = request.get_json()
+	print(f"[DEBUG] Request data: {data}")
+
+	# Sanitize and validate input
+	data = InputValidator.sanitize_input(data)
+	is_valid, error_msg, cleaned_data = InputValidator.validate_location_request(data)
+	if not is_valid:
+		error_response = ResponseFormatter.format_error(error_msg, 'VALIDATION_ERROR')
+		return jsonify(error_response), 400
+
+	# Build query
+	if 'location' in cleaned_data:
+		query = cleaned_data['location']
+	else:
+		query = f"{cleaned_data['lat']},{cleaned_data['lon']}"
+
+	# Get days parameter for marine forecast (default 3 days, max 7)
+	days = min(int(data.get('days', 3)), 7)
+
+	params = {
+		'key': WEATHER_API_KEY,
+		'q': query,
+		'days': days
+	}
+
+	try:
+		print(f"[DEBUG] Calling WeatherAPI marine with params: {params}")
+		resp = requests.get(WEATHER_API_MARINE_URL, params=params, timeout=10)
+		resp.raise_for_status()
+		print(f"[DEBUG] WeatherAPI marine response successful")
+
+		marine_data = resp.json()
+		
+		# Translate to Vietnamese if needed
+		marine_data = WeatherTranslator.translate_forecast(marine_data)
+		
+		# Format response using forecast formatter (marine data has similar structure)
+		formatted_data = ResponseFormatter.format_forecast(marine_data)
+
+		success_response = ResponseFormatter.format_success(
+			formatted_data,
+			'Dữ liệu thời tiết biển lấy thành công'
+		)
+		
+		return jsonify(success_response), 200
+
+	except requests.exceptions.HTTPError as e:
+		print(f"[ERROR] WeatherAPI marine HTTP error: {e}")
+		if resp.status_code == 400:
+			error_response = ResponseFormatter.format_error(
+				'Địa điểm hoặc tọa độ không hợp lệ cho dữ liệu thời tiết biển',
+				'INVALID_LOCATION',
+				400
+			)
+			return jsonify(error_response), 400
+		elif resp.status_code == 401:
+			error_response = ResponseFormatter.format_error(
+				'API key không hợp lệ',
+				'INVALID_API_KEY',
+				401
+			)
+			return jsonify(error_response), 401
+		elif resp.status_code == 403:
+			error_response = ResponseFormatter.format_error(
+				'API key đã vượt quá giới hạn hoặc không có quyền truy cập dữ liệu thời tiết biển',
+				'API_LIMIT_EXCEEDED',
+				403
+			)
+			return jsonify(error_response), 403
+		else:
+			error_response = ResponseFormatter.format_error(
+				f'Lỗi WeatherAPI: {str(e)}',
+				'WEATHER_API_ERROR',
+				resp.status_code
+			)
+			return jsonify(error_response), resp.status_code
+
+	except requests.exceptions.Timeout:
+		print(f"[ERROR] WeatherAPI marine timeout")
+		error_response = ResponseFormatter.format_error(
+			'Request timeout. Vui lòng thử lại',
+			'REQUEST_TIMEOUT',
+			504
+		)
+		return jsonify(error_response), 504
+
+	except Exception as e:
+		print(f"[ERROR] Error in marine weather: {str(e)}")
+		error_response = ResponseFormatter.format_error(
+			f'Lỗi không mong muốn: {str(e)}',
+			'INTERNAL_ERROR',
+			500
+		)
+		return jsonify(error_response), 500
+
+# Sports Events endpoint
+@app.route('/api/weather/sports', methods=['POST'])
+def get_sports_events():
+	"""Get upcoming sports events data"""
+	try:
+		request_data = request.get_json() or {}
+		location = request_data.get('location', '').strip()
+		language = request_data.get('language', 'vi')
+		
+		if not location:
+			print(f"[ERROR] No location provided for sports events request")
+			error_response = ResponseFormatter.format_error(
+				'Vui lòng cung cấp thông tin địa điểm',
+				'MISSING_LOCATION',
+				400
+			)
+			return jsonify(error_response), 400
+		
+		# Validate location
+		is_valid, error_msg = InputValidator.validate_location_string(location)
+		if not is_valid:
+			print(f"[ERROR] Invalid location for sports events: {location} - {error_msg}")
+			error_response = ResponseFormatter.format_error(
+				error_msg or 'Địa điểm không hợp lệ',
+				'INVALID_LOCATION',
+				400
+			)
+			return jsonify(error_response), 400
+		
+		print(f"[INFO] Getting sports events for location: {location}")
+		
+		response = requests.get(
+			WEATHER_API_SPORTS_URL,
+			params={'key': WEATHER_API_KEY, 'q': location},
+			timeout=10
+		)
+		
+		if response.status_code == 400:
+			print(f"[ERROR] Bad request for sports events: {response.text}")
+			error_response = ResponseFormatter.format_error(
+				'Địa điểm hoặc thông số không hợp lệ',
+				'INVALID_LOCATION',
+				400
+			)
+			return jsonify(error_response), 400
+		
+		if response.status_code == 401:
+			print(f"[ERROR] Unauthorized API request for sports events")
+			error_response = ResponseFormatter.format_error(
+				'Lỗi xác thực API',
+				'API_AUTH_ERROR',
+				401
+			)
+			return jsonify(error_response), 401
+		
+		if response.status_code == 403:
+			print(f"[ERROR] Forbidden API request for sports events")
+			error_response = ResponseFormatter.format_error(
+				'Không có quyền truy cập API',
+				'API_ACCESS_DENIED',
+				403
+			)
+			return jsonify(error_response), 403
+		
+		if response.status_code != 200:
+			print(f"[ERROR] API request failed for sports events: {response.status_code}")
+			error_response = ResponseFormatter.format_error(
+				'Không thể lấy dữ liệu sự kiện thể thao',
+				'SPORTS_EVENTS_FAILED',
+				response.status_code
+			)
+			return jsonify(error_response), response.status_code
+		
+		sports_data = response.json()
+		print(f"[INFO] Sports events data retrieved successfully")
+		
+		# Sports API returns a different structure - array of events
+		# Format the sports events data directly (no need for forecast formatting)
+		formatted_data = sports_data
+		
+		success_response = ResponseFormatter.format_success(
+			formatted_data,
+			'Dữ liệu sự kiện thể thao lấy thành công'
+		)
+		return jsonify(success_response), 200
+		
+	except requests.Timeout:
+		print(f"[ERROR] API request timeout for sports events")
+		error_response = ResponseFormatter.format_error(
+			'Yêu cầu API bị timeout',
+			'API_TIMEOUT',
+			504
+		)
+		return jsonify(error_response), 504
+
+	except Exception as e:
+		print(f"[ERROR] Error in sports events: {str(e)}")
+		error_response = ResponseFormatter.format_error(
+			f'Lỗi không mong muốn: {str(e)}',
+			'INTERNAL_ERROR',
+			500
+		)
+		return jsonify(error_response), 500
+
+# Time Zone endpoint
+@app.route('/api/weather/timezone', methods=['POST'])
+def get_timezone():
+	"""Get timezone information for a location"""
+	try:
+		request_data = request.get_json() or {}
+		location = request_data.get('location', '').strip()
+		language = request_data.get('language', 'vi')
+		
+		if not location:
+			print(f"[ERROR] No location provided for timezone request")
+			error_response = ResponseFormatter.format_error(
+				'Vui lòng cung cấp thông tin địa điểm',
+				'MISSING_LOCATION',
+				400
+			)
+			return jsonify(error_response), 400
+		
+		# Validate location
+		is_valid, error_msg = InputValidator.validate_location_string(location)
+		if not is_valid:
+			print(f"[ERROR] Invalid location for timezone: {location} - {error_msg}")
+			error_response = ResponseFormatter.format_error(
+				error_msg or 'Địa điểm không hợp lệ',
+				'INVALID_LOCATION',
+				400
+			)
+			return jsonify(error_response), 400
+		
+		print(f"[INFO] Getting timezone for location: {location}")
+		
+		response = requests.get(
+			WEATHER_API_TIMEZONE_URL,
+			params={'key': WEATHER_API_KEY, 'q': location},
+			timeout=10
+		)
+		
+		if response.status_code == 400:
+			print(f"[ERROR] Bad request for timezone: {response.text}")
+			error_response = ResponseFormatter.format_error(
+				'Địa điểm hoặc thông số không hợp lệ',
+				'INVALID_LOCATION',
+				400
+			)
+			return jsonify(error_response), 400
+		
+		if response.status_code == 401:
+			print(f"[ERROR] Unauthorized API request for timezone")
+			error_response = ResponseFormatter.format_error(
+				'Lỗi xác thực API',
+				'API_AUTH_ERROR',
+				401
+			)
+			return jsonify(error_response), 401
+		
+		if response.status_code == 403:
+			print(f"[ERROR] Forbidden API request for timezone")
+			error_response = ResponseFormatter.format_error(
+				'Không có quyền truy cập API',
+				'API_ACCESS_DENIED',
+				403
+			)
+			return jsonify(error_response), 403
+		
+		if response.status_code != 200:
+			print(f"[ERROR] API request failed for timezone: {response.status_code}")
+			error_response = ResponseFormatter.format_error(
+				'Không thể lấy thông tin múi giờ',
+				'TIMEZONE_FAILED',
+				response.status_code
+			)
+			return jsonify(error_response), response.status_code
+		
+		timezone_data = response.json()
+		print(f"[INFO] Timezone data retrieved successfully")
+		
+		# Format the timezone data (use location formatting)
+		formatted_data = ResponseFormatter._format_location(timezone_data.get('location', {}))
+		
+		success_response = ResponseFormatter.format_success(
+			formatted_data,
+			'Thông tin múi giờ lấy thành công'
+		)
+		return jsonify(success_response), 200
+		
+	except requests.Timeout:
+		print(f"[ERROR] API request timeout for timezone")
+		error_response = ResponseFormatter.format_error(
+			'Yêu cầu API bị timeout',
+			'API_TIMEOUT',
+			504
+		)
+		return jsonify(error_response), 504
+
+	except Exception as e:
+		print(f"[ERROR] Error in timezone: {str(e)}")
+		error_response = ResponseFormatter.format_error(
+			f'Lỗi không mong muốn: {str(e)}',
+			'INTERNAL_ERROR',
+			500
+		)
+		return jsonify(error_response), 500
+
+# Future Weather endpoint  
+@app.route('/api/weather/future', methods=['POST'])
+def get_future_weather():
+	"""Get future weather forecast data (beyond 14 days)"""
+	try:
+		request_data = request.get_json() or {}
+		location = request_data.get('location', '').strip()
+		date = request_data.get('date', '').strip()
+		language = request_data.get('language', 'vi')
+		
+		if not location:
+			print(f"[ERROR] No location provided for future weather request")
+			error_response = ResponseFormatter.format_error(
+				'Vui lòng cung cấp thông tin địa điểm',
+				'MISSING_LOCATION',
+				400
+			)
+			return jsonify(error_response), 400
+			
+		if not date:
+			print(f"[ERROR] No date provided for future weather request")
+			error_response = ResponseFormatter.format_error(
+				'Vui lòng cung cấp ngày cần dự báo',
+				'MISSING_DATE',
+				400
+			)
+			return jsonify(error_response), 400
+		
+		# Validate location
+		is_valid, error_msg = InputValidator.validate_location_string(location)
+		if not is_valid:
+			print(f"[ERROR] Invalid location for future weather: {location} - {error_msg}")
+			error_response = ResponseFormatter.format_error(
+				error_msg or 'Địa điểm không hợp lệ',
+				'INVALID_LOCATION',
+				400
+			)
+			return jsonify(error_response), 400
+		
+		print(f"[INFO] Getting future weather for location: {location}, date: {date}")
+		
+		response = requests.get(
+			WEATHER_API_FUTURE_URL,
+			params={'key': WEATHER_API_KEY, 'q': location, 'dt': date},
+			timeout=10
+		)
+		
+		if response.status_code == 400:
+			print(f"[ERROR] Bad request for future weather: {response.text}")
+			error_response = ResponseFormatter.format_error(
+				'Địa điểm, ngày hoặc thông số không hợp lệ',
+				'INVALID_LOCATION_OR_DATE',
+				400
+			)
+			return jsonify(error_response), 400
+		
+		if response.status_code == 401:
+			print(f"[ERROR] Unauthorized API request for future weather")
+			error_response = ResponseFormatter.format_error(
+				'Lỗi xác thực API',
+				'API_AUTH_ERROR',
+				401
+			)
+			return jsonify(error_response), 401
+		
+		if response.status_code == 403:
+			print(f"[ERROR] Forbidden API request for future weather")
+			error_response = ResponseFormatter.format_error(
+				'Không có quyền truy cập API',
+				'API_ACCESS_DENIED',
+				403
+			)
+			return jsonify(error_response), 403
+		
+		if response.status_code != 200:
+			print(f"[ERROR] API request failed for future weather: {response.status_code}")
+			error_response = ResponseFormatter.format_error(
+				'Không thể lấy dữ liệu thời tiết tương lai',
+				'FUTURE_WEATHER_FAILED',
+				response.status_code
+			)
+			return jsonify(error_response), response.status_code
+		
+		future_data = response.json()
+		print(f"[INFO] Future weather data retrieved successfully")
+		
+		# Format the future data using ResponseFormatter
+		formatted_data = ResponseFormatter.format_forecast(future_data)
+		
+		# Translate Vietnamese if needed
+		if language == 'vi':
+			formatted_data = WeatherTranslator.translate_forecast(formatted_data)
+		
+		success_response = ResponseFormatter.format_success(
+			formatted_data,
+			'Dữ liệu thời tiết tương lai lấy thành công'
+		)
+		return jsonify(success_response), 200
+		
+	except requests.Timeout:
+		print(f"[ERROR] API request timeout for future weather")
+		error_response = ResponseFormatter.format_error(
+			'Yêu cầu API bị timeout',
+			'API_TIMEOUT',
+			504
+		)
+		return jsonify(error_response), 504
+
+	except Exception as e:
+		print(f"[ERROR] Error in future weather: {str(e)}")
 		error_response = ResponseFormatter.format_error(
 			f'Lỗi không mong muốn: {str(e)}',
 			'INTERNAL_ERROR',

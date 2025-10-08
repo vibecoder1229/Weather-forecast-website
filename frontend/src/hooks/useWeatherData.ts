@@ -146,3 +146,40 @@ export function useAlerts(): UseWeatherDataResult {
   return { data, loading, error, refetch: fetchAlerts };
 }
 
+export function useEnhancedCurrentWeather() {
+  const { settings } = useWeather();
+  const [data, setData] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchEnhancedWeather = async () => {
+    if (!settings.location && !settings.coordinates) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const query = settings.location 
+        ? { location: settings.location }
+        : { lat: settings.coordinates!.lat, lon: settings.coordinates!.lon };
+
+      const data = await weatherApi.getEnhancedCurrentWeather(query);
+      setData(data);
+    } catch (err: any) {
+      setError(err.message || 'Lỗi kết nối đến server');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEnhancedWeather();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.location, settings.coordinates]);
+
+  return { data, loading, error, refetch: fetchEnhancedWeather };
+}
+

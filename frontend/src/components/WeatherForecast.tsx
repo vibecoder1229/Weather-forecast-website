@@ -10,7 +10,9 @@ export function WeatherForecast() {
   const { data, loading, error } = useForecast(3);
   const { settings } = useWeather();
 
-  const convertTemp = (tempC: number) => {
+  const convertTemp = (tempC: number | null | undefined) => {
+    if (tempC == null) return '--°';
+    
     if (settings.temperatureUnit === 'fahrenheit') {
       return `${Math.round((tempC * 9/5) + 32)}°F`;
     }

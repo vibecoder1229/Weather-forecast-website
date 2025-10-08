@@ -20,6 +20,57 @@ interface IconVariations {
 }
 
 /**
+ * GIF icons mapping for weather conditions
+ * Maps condition codes to GIF filenames in the main weather_icons folder
+ */
+const GIF_WEATHER_MAPPING: Record<number, string> = {
+  // Clear/Sunny
+  1000: 'sunrise.gif',
+  
+  // Cloudy conditions
+  1003: 'clouds.gif',
+  1006: 'clouds.gif',
+  1009: 'clouds.gif',
+  
+  // Rain conditions
+  1063: 'rain.gif',
+  1180: 'rain.gif',
+  1183: 'rain.gif',
+  1186: 'rain.gif',
+  1189: 'rain.gif',
+  1192: 'rain.gif',
+  1195: 'rain.gif',
+  1240: 'rain.gif',
+  1243: 'rain.gif',
+  1246: 'rain.gif',
+  
+  // Snow conditions
+  1066: 'snow.gif',
+  1114: 'snow-storm.gif',
+  1117: 'snow-storm.gif',
+  1210: 'snow.gif',
+  1213: 'snow.gif',
+  1216: 'snow.gif',
+  1219: 'snow.gif',
+  1222: 'snow.gif',
+  1225: 'snow.gif',
+  1255: 'snow.gif',
+  1258: 'snow.gif',
+  
+  // Storm/Thunder conditions
+  1087: 'storm.gif',
+  1273: 'storm.gif',
+  1276: 'storm1.gif',
+  1279: 'storm.gif',
+  1282: 'storm1.gif',
+  
+  // Wind conditions
+  1030: 'windy.gif', // Mist
+  1135: 'windy.gif', // Fog
+  1147: 'windy.gif', // Freezing fog
+};
+
+/**
  * Map WeatherAPI condition codes to local icon filenames
  * Icons are located in /weather_icons/weather-icons-master/production/fill/all/
  * Each mapping includes animation support and fallback options
@@ -354,6 +405,16 @@ const ICON_VARIATIONS: IconVariations = {
 const DEFAULT_FALLBACK = 'not-available.svg';
 
 /**
+ * Get GIF icon path if available for the weather condition
+ * @param code - WeatherAPI condition code
+ * @returns GIF icon path or null if not available
+ */
+function getGifIconPath(code: number): string | null {
+  const gifFile = GIF_WEATHER_MAPPING[code];
+  return gifFile ? `/weather_icons/${gifFile}` : null;
+}
+
+/**
  * Check if an icon file exists (for fallback mechanism)
  * Note: This is a simple check that can be enhanced with actual file existence validation
  */
@@ -367,36 +428,119 @@ function getAvailableIconPath(iconFile: string, variation: 'fill' | 'line' = 'fi
  * @param isDay - Whether it's day time (1) or night (0)
  * @param variation - Icon style variation ('fill' or 'line')
  * @param enableAnimation - Whether to prioritize animated icons
- * @returns Path to the local SVG icon
+ * @param preferGif - Whether to prefer GIF icons over SVG when available
+ * @returns Path to the local icon (GIF or SVG)
  */
 export function getWeatherIcon(
   code: number, 
   isDay: number, 
   variation: 'fill' | 'line' = 'fill',
-  enableAnimation: boolean = true
+  enableAnimation: boolean = true,
+  preferGif: boolean = true
 ): string {
-  const mapping = WEATHER_ICON_MAP[code];
+  // Validate inputs and provide safe defaults
+  const safeCode = typeof code === 'number' && !isNaN(code) ? code : 1000;
+  const safeIsDay = typeof isDay === 'number' ? (isDay === 1 ? 1 : 0) : 1;
+  
+  // Debug logging in development
+  if (import.meta.env.DEV) {
+    console.log(`[WeatherIcon] Loading icon for code: ${safeCode}, isDay: ${safeIsDay}, variation: ${variation}, preferGif: ${preferGif}`);
+  }
+  
+  // First, try to get GIF icon if preferred and animation is enabled
+  if (preferGif && enableAnimation) {
+    const gifPath = getGifIconPath(safeCode);
+    if (gifPath) {
+      if (import.meta.env.DEV) {
+        console.log(`[WeatherIcon] Using GIF: ${gifPath}`);
+      }
+      return gifPath;
+    }
+  }
+  
+  const mapping = WEATHER_ICON_MAP[safeCode];
   
   if (!mapping) {
-    console.warn(`No icon mapping found for weather code: ${code}, using default fallback`);
+    console.warn(`[WeatherIcon] No icon mapping found for weather code: ${safeCode}, using default fallback`);
     return getAvailableIconPath(DEFAULT_FALLBACK, variation);
   }
   
-  // Choose day or night icon
-  const iconFile = isDay === 1 ? mapping.day : mapping.night;
+  // Choose day or night icon with fallback
+  let iconFile = safeIsDay === 1 ? mapping.day : mapping.night;
   
+  // If the selected icon doesn't exist, try the other time variant
+  if (!iconFile) {
+    iconFile = safeIsDay === 1 ? mapping.night : mapping.day;
+    console.warn(`[WeatherIcon] Missing ${safeIsDay === 1 ? 'day' : 'night'} icon for code ${safeCode}, using ${safeIsDay === 1 ? 'night' : 'day'} variant`);
+  }
+  
+  // If still no icon, use fallback
+  if (!iconFile && mapping.fallback) {
+    iconFile = mapping.fallback;
+    console.warn(`[WeatherIcon] Using fallback icon for code ${safeCode}`);
+  }
+  
+  // Final fallback to default
+  if (!iconFile) {
+    console.warn(`[WeatherIcon] No icon available for code ${safeCode}, using default fallback`);
+    return getAvailableIconPath(DEFAULT_FALLBACK, variation);
+  }
+  
+  const finalPath = getAvailableIconPath(iconFile, variation);
+  
+  if (import.meta.env.DEV) {
+    console.log(`[WeatherIcon] Final path: ${finalPath}`);
+  }
+  
+  return finalPath;
   // If animation is disabled and there's a static fallback, use it
   if (!enableAnimation && mapping.fallback) {
     return getAvailableIconPath(mapping.fallback, variation);
   }
   
-  // Return the primary icon path
-  const primaryPath = getAvailableIconPath(iconFile, variation);
+  // Return the SVG icon path
+  return getAvailableIconPath(iconFile, variation);
+}
+
+/**
+ * Enhanced weather icon getter with comprehensive validation and fallbacks
+ * This is the recommended function to use in components
+ * @param code - WeatherAPI condition code
+ * @param isDay - Whether it's day time (1) or night (0)
+ * @param variation - Icon style variation ('fill' or 'line')
+ * @param preferGif - Whether to prefer GIF icons over SVG when available
+ */
+export function getValidatedWeatherIcon(
+  code: number | undefined | null, 
+  isDay: number | undefined | null,
+  variation: 'fill' | 'line' = 'fill',
+  preferGif: boolean = true
+): { iconPath: string; isDefault: boolean; description: string; isGif: boolean } {
+  // Provide safe defaults for invalid inputs
+  const safeCode = (typeof code === 'number' && !isNaN(code) && code > 0) ? code : 1000;
+  const safeIsDay = (typeof isDay === 'number' && (isDay === 0 || isDay === 1)) ? isDay : 1;
   
-  // TODO: In a production app, you might want to add actual file existence checking here
-  // For now, we'll trust that the mapped icons exist
+  const iconPath = getWeatherIcon(safeCode, safeIsDay, variation, true, preferGif);
+  const isDefault = iconPath.includes(DEFAULT_FALLBACK);
+  const isGif = iconPath.endsWith('.gif');
   
-  return primaryPath;
+  // Get description for the icon
+  const mapping = WEATHER_ICON_MAP[safeCode];
+  const timeOfDay = safeIsDay === 1 ? 'day' : 'night';
+  
+  let description = 'Weather condition';
+  if (mapping) {
+    description = `Weather condition ${safeCode} during ${timeOfDay}`;
+  } else if (isDefault) {
+    description = 'Weather data unavailable';
+  }
+  
+  return {
+    iconPath,
+    isDefault,
+    description,
+    isGif
+  };
 }
 
 /**

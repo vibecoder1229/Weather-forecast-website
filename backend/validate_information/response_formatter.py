@@ -146,8 +146,9 @@ class ResponseFormatter:
         return {
             'temp_c': current.get('temp_c', 0),
             'temp_f': current.get('temp_f', 0),
-            'feels_like_c': current.get('feelslike_c', 0),
-            'feels_like_f': current.get('feelslike_f', 0),
+            'is_day': current.get('is_day', 1),  # Add the missing is_day field
+            'feelslike_c': current.get('feelslike_c', 0),
+            'feelslike_f': current.get('feelslike_f', 0),
             'condition': {
                 'text': condition.get('text', 'Unknown'),
                 'text_vi': condition.get('text_vi', condition.get('text', 'Unknown')),
@@ -296,3 +297,126 @@ class ResponseFormatter:
                 return default
         
         return value if value is not None else default
+    
+    @staticmethod
+    def format_enhanced_current_weather(enhanced_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Format enhanced current weather data for frontend
+        
+        Args:
+            enhanced_data: Enhanced weather data with all enhancements
+            
+        Returns:
+            Formatted enhanced weather data
+        """
+        if not enhanced_data:
+            return {}
+        
+        # Start with basic formatting
+        formatted = ResponseFormatter.format_current_weather(enhanced_data)
+        
+        # Add enhanced sections
+        if 'astronomy' in enhanced_data:
+            formatted['astronomy'] = enhanced_data['astronomy']
+        
+        if 'environmental' in enhanced_data:
+            formatted['environmental'] = enhanced_data['environmental']
+        
+        if 'recommendations' in enhanced_data:
+            formatted['recommendations'] = enhanced_data['recommendations']
+        
+        if 'air_quality_enhanced' in enhanced_data:
+            formatted['air_quality_enhanced'] = enhanced_data['air_quality_enhanced']
+        
+        if 'insights' in enhanced_data:
+            formatted['insights'] = enhanced_data['insights']
+        
+        # Add basic recommendations if they exist
+        if 'basic_recommendations' in enhanced_data:
+            formatted['basic_recommendations'] = enhanced_data['basic_recommendations']
+        
+        return formatted
+    
+    @staticmethod
+    def format_enhanced_forecast(enhanced_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Format enhanced forecast data for frontend
+        
+        Args:
+            enhanced_data: Enhanced forecast data with hourly and insights
+            
+        Returns:
+            Formatted enhanced forecast data
+        """
+        if not enhanced_data:
+            return {}
+        
+        # Start with basic forecast formatting
+        formatted = ResponseFormatter.format_forecast(enhanced_data)
+        
+        # Add hourly forecast if available
+        if 'hourly_forecast' in enhanced_data:
+            formatted['hourly_forecast'] = enhanced_data['hourly_forecast']
+        
+        # Add enhanced current weather
+        if 'current_enhanced' in enhanced_data:
+            formatted['current_enhanced'] = enhanced_data['current_enhanced']
+        
+        # Add insights if available
+        if 'insights' in enhanced_data:
+            formatted['insights'] = enhanced_data['insights']
+        
+        return formatted
+    
+    @staticmethod
+    def _format_hourly_data(hourly_list: list) -> list:
+        """Format hourly forecast data"""
+        if not hourly_list:
+            return []
+        
+        formatted_hours = []
+        for hour in hourly_list:
+            formatted_hour = {
+                'time': hour.get('time', ''),
+                'time_epoch': hour.get('time_epoch', 0),
+                'temp_c': hour.get('temp_c', 0),
+                'temp_f': hour.get('temp_f', 32),
+                'feelslike_c': hour.get('feelslike_c', 0),
+                'feelslike_f': hour.get('feelslike_f', 32),
+                'condition': {
+                    'text': hour.get('condition', {}).get('text', 'Unknown'),
+                    'text_vi': hour.get('condition', {}).get('text_vi', 
+                                     hour.get('condition', {}).get('text', 'Unknown')),
+                    'icon': hour.get('condition', {}).get('icon', ''),
+                    'code': hour.get('condition', {}).get('code', 0),
+                },
+                'wind_kph': hour.get('wind_kph', 0),
+                'wind_mph': hour.get('wind_mph', 0),
+                'wind_dir': hour.get('wind_dir', 'N'),
+                'pressure_mb': hour.get('pressure_mb', 0),
+                'pressure_in': hour.get('pressure_in', 0),
+                'humidity': hour.get('humidity', 0),
+                'cloud': hour.get('cloud', 0),
+                'chance_of_rain': hour.get('chance_of_rain', 0),
+                'chance_of_snow': hour.get('chance_of_snow', 0),
+                'uv': hour.get('uv', 0),
+                'vis_km': hour.get('vis_km', 0),
+                'vis_miles': hour.get('vis_miles', 0),
+            }
+            formatted_hours.append(formatted_hour)
+        
+        return formatted_hours
+
+    @staticmethod
+    def _format_astronomy(astronomy: Dict[str, Any]) -> Dict[str, Any]:
+        """Format astronomy data for consistent display"""
+        return {
+            'sunrise': astronomy.get('sunrise', ''),
+            'sunset': astronomy.get('sunset', ''),
+            'moonrise': astronomy.get('moonrise', ''),
+            'moonset': astronomy.get('moonset', ''),
+            'moon_phase': astronomy.get('moon_phase', ''),
+            'moon_illumination': astronomy.get('moon_illumination', 0),
+            'is_moon_up': astronomy.get('is_moon_up', 0),
+            'is_sun_up': astronomy.get('is_sun_up', 0),
+        }

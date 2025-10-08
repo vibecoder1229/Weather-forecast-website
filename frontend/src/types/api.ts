@@ -57,6 +57,7 @@ export interface Location {
 
 export interface Condition {
   text: string;
+  text_vi?: string;
   icon: string;
   code: number;
 }
@@ -250,6 +251,218 @@ export interface HealthCheckResponse {
   status: 'ok' | 'error';
   message: string;
   weatherapi_configured: boolean;
+}
+
+// ============================================================================
+// Enhanced Weather Data Types
+// ============================================================================
+
+export interface ClothingRecommendation {
+  suggestion: string;
+  suggestion_vi: string;
+  items: string[];
+  umbrella_needed: boolean;
+  sunglasses_needed: boolean;
+  sun_protection_level: 'low' | 'medium' | 'high';
+}
+
+export interface ActivityRecommendation {
+  recommended: boolean;
+  rating: number;
+  best_times?: string[];
+  precautions?: string[];
+  reason?: string;
+}
+
+export interface ActivityRecommendations {
+  outdoor_fitness: ActivityRecommendation;
+  beach_activities: ActivityRecommendation;
+  gardening: ActivityRecommendation;
+}
+
+export interface TravelConditions {
+  driving_conditions: string;
+  driving_conditions_vi: string;
+  visibility_rating: number;
+  road_conditions: string;
+  visibility_km: number;
+}
+
+export interface Recommendations {
+  clothing: ClothingRecommendation;
+  activities: ActivityRecommendations;
+  travel: TravelConditions;
+}
+
+export interface GoldenBlueHour {
+  morning_start: string;
+  morning_end: string;
+  evening_start: string;
+  evening_end: string;
+}
+
+export interface EnhancedAstronomy extends Astronomy {
+  moon_phase_vi: string;
+  golden_hour: GoldenBlueHour;
+  blue_hour: GoldenBlueHour;
+}
+
+export interface ComfortIndex {
+  level: string;
+  level_vi: string;
+  score: number;
+}
+
+export interface UVRecommendations {
+  category: string;
+  category_vi: string;
+  recommendations: string;
+  recommendations_vi: string;
+}
+
+export interface EnvironmentalData {
+  uv_index: number;
+  category: string;
+  category_vi: string;
+  recommendations: string;
+  recommendations_vi: string;
+  dew_point: number;
+  heat_index: number;
+  wind_chill?: number | null;
+  comfort_index: ComfortIndex;
+}
+
+export interface EnhancedAirQuality {
+  aqi_us: number;
+  aqi_category: string;
+  aqi_category_vi: string;
+  aqi_color: string;
+  description: string;
+  description_vi: string;
+  health_advice: string;
+  health_advice_vi: string;
+  mask_recommended: boolean;
+  recommended_activities: string[];
+  pollutants: {
+    pm2_5: {
+      value: number;
+      level: string;
+      level_vi: string;
+      unit: string;
+      description: string;
+      description_vi: string;
+    };
+    pm10: {
+      value: number;
+      level: string;
+      level_vi: string;
+      unit: string;
+      description: string;
+      description_vi: string;
+    };
+    ozone: {
+      value: number;
+      level: string;
+      level_vi: string;
+      unit: string;
+      description: string;
+      description_vi: string;
+    };
+  };
+  health_recommendations: Array<{
+    type: string;
+    message: string;
+    message_vi: string;
+    priority: string;
+  }>;
+  last_updated: string;
+}
+
+export interface TemperatureTrend {
+  trend: string;
+  trend_vi: string;
+  change_24h: string;
+  comparison_yesterday: string;
+  comparison_yesterday_vi: string;
+  trend_strength: string;
+}
+
+export interface SeasonalComparison {
+  vs_average: string;
+  vs_average_vi: string;
+  seasonal_average: number;
+  percentile: number;
+  climate_type: string;
+  season: {
+    name: string;
+    name_vi: string;
+  };
+}
+
+export interface NotableCondition {
+  type: string;
+  severity: string;
+  message: string;
+  message_vi: string;
+  icon: string;
+}
+
+export interface WeatherInsights {
+  temperature_trend: TemperatureTrend;
+  seasonal_comparison: SeasonalComparison;
+  notable_conditions: NotableCondition[];
+  forecast_insights: any;
+  summary: {
+    text: string;
+    text_vi: string;
+  };
+  generated_at: string;
+}
+
+export interface HourlyForecastData {
+  time: string;
+  time_epoch: number;
+  temp_c: number;
+  feelslike_c: number;
+  condition: {
+    text: string;
+    text_vi?: string;
+    icon: string;
+    code: number;
+  };
+  wind_kph: number;
+  wind_dir: string;
+  pressure_mb: number;
+  humidity: number;
+  cloud: number;
+  chance_of_rain: number;
+  chance_of_snow: number;
+  uv: number;
+  vis_km: number;
+}
+
+export interface HourlyForecast {
+  hours: HourlyForecastData[];
+}
+
+// Enhanced Response Types
+export interface EnhancedCurrentWeatherResponse {
+  location: Location;
+  current: CurrentWeather;
+  astronomy: EnhancedAstronomy;
+  environmental: EnvironmentalData;
+  recommendations: Recommendations;
+  air_quality_enhanced: EnhancedAirQuality;
+  insights: WeatherInsights;
+}
+
+export interface EnhancedForecastWeatherResponse {
+  location: Location;
+  forecast: {
+    forecastday: ForecastDay[];
+  };
+  hourly_forecast: HourlyForecast;
+  current_enhanced: EnhancedCurrentWeatherResponse;
 }
 
 // ============================================================================
